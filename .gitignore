@@ -1,0 +1,7 @@
+__pycache__
+
+videos/original/*
+
+videos/modified/*
+
+reports/*
