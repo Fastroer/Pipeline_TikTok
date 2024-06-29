@@ -1,10 +1,7 @@
 import os
 import cv2
 from moviepy.editor import AudioFileClip, VideoFileClip, concatenate_audioclips, vfx
-import concurrent.futures
-import threading
-
-lock = threading.Lock()
+import multiprocessing
 
 def process_video(input_path, output_path, audio_path, errors):
     """
@@ -49,12 +46,11 @@ def process_video(input_path, output_path, audio_path, errors):
     except Exception as e:
         errors.append(f"Ошибка обработки видео {input_path}: {e}")
     finally:
-        with lock:
-            if os.path.exists(temp_output_path):
-                try:
-                    os.remove(temp_output_path)
-                except Exception as e:
-                    errors.append(f"Ошибка удаления временного файла {temp_output_path}: {e}")
+        if os.path.exists(temp_output_path):
+            try:
+                os.remove(temp_output_path)
+            except Exception as e:
+                errors.append(f"Ошибка удаления временного файла {temp_output_path}: {e}")
 
 def add_audio_to_video(temp_video_path, final_video_path, audio_path, fps):
     """
@@ -118,15 +114,9 @@ def modify_videos(input_folder, output_folder, audio_path):
     list: Список сообщений об ошибках, возникших при обработке видеофайлов.
     """
     input_files = [os.path.join(input_folder, f) for f in os.listdir(input_folder) if f.endswith('.mp4')]
-    errors = []
+    errors = multiprocessing.Manager().list()
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(modify_video, input_file, output_folder, audio_path, errors) for input_file in input_files]
+    with multiprocessing.Pool() as pool:
+        pool.starmap(modify_video, [(input_file, output_folder, audio_path, errors) for input_file in input_files])
 
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                future.result()
-            except Exception as e:
-                errors.append(str(e))
-
-    return errors
+    return list(errors)
